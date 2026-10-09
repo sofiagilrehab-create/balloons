@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Accessible Balloon Pop - High Reliability Touch</title>
+    <!-- Tailwind CSS for staff control panel UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Lock down touch scrolling, zoom, and accidental text selection */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            touch-action: none;
+            -webkit-touch-callout: none;
+            user-select: none;
+            -webkit-user-select: none;
+            background-color: #0b1329;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            cursor: pointer;
+        }
+
+        /* Glassmorphism panel styling */
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.88);
+            backdrop-filter: blur(12px);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body class="relative w-full h-full overflow-hidden text-white select-none">
+
+    <!-- Fullscreen Interactive Canvas -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Header Stats Bar -->
+    <div class="absolute top-4 left-4 right-4 flex justify-between items-center pointer-events-none z-10">
+        <div class="flex items-center gap-4 sm:gap-6 glass-panel px-5 py-3 rounded-2xl shadow-2xl pointer-events-auto">
+            <div class="flex flex-col">
+                <span class="text-xs font-bold uppercase tracking-wider text-cyan-300">Total Pops</span>
+                <span id="popCounter" class="text-3xl sm:text-5xl font-black text-yellow-400">0</span>
+            </div>
+            <div id="scoreContainer" class="flex flex-col border-l border-slate-700 pl-4 sm:pl-6">
+                <span class="text-xs font-bold uppercase tracking-wider text-pink-300">Score</span>
+                <span id="scoreDisplay" class="text-3xl sm:text-5xl font-black text-emerald-400">0</span>
+            </div>
+        </div>
+
+        <!-- Staff Controls Button -->
+        <button id="btnOpenSettings" class="pointer-events-auto bg-slate-800 hover:bg-slate-700 border-2 border-slate-500 text-white p-3 sm:p-4 rounded-2xl shadow-2xl flex items-center gap-2 active:scale-95 transition">
+            <svg class="w-8 h-8 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+            <span class="font-bold text-lg hidden sm:inline">Staff Panel</span>
+        </button>
+    </div>
+
+    <!-- Staff Settings Modal -->
+    <div id="settingsModal" class="fixed inset-0 bg-black/80 backdrop-blur-md hidden justify-center items-center z-50 p-4">
+        <div class="glass-panel w-full max-w-xl rounded-3xl p-6 sm:p-8 max-h-[90vh] overflow-y-auto border-2 border-cyan-500/30 text-slate-100 shadow-2xl">
+            <div class="flex justify-between items-center mb-6 border-b border-slate-700 pb-4">
+                <h2 class="text-2xl font-black text-white">Accessibility & Staff Controls</h2>
+                <button id="btnCloseSettings" class="bg-slate-800 hover:bg-slate-700 p-3 rounded-xl text-slate-300">✕</button>
+            </div>
+
+            <div class="space-y-5">
+                <!-- Balloon Hitbox Pad Size -->
+                <div>
+                    <label class="block text-sm font-bold uppercase text-cyan-300 mb-2">Hitbox Target Size (Ease of Tapping)</label>
+                    <div class="grid grid-cols-3 gap-3">
+                        <button data-hitbox="1.3" class="btn-hitbox py-3 px-2 rounded-xl bg-slate-800 border-2 border-slate-700 font-bold">Standard</button>
+                        <button data-hitbox="1.85" class="btn-hitbox py-3 px-2 rounded-xl bg-cyan-600 border-2 border-cyan-300 font-bold text-white shadow-lg">Giant (Easy)</button>
+                        <button data-hitbox="2.4" class="btn-hitbox py-3 px-2 rounded-xl bg-slate-800 border-2 border-slate-700 font-bold">Maximum</button>
+                    </div>
+                </div>
+
+                <!-- Balloon Speed Option -->
+                <div>
+                    <label class="block text-sm font-bold uppercase text-cyan-300 mb-2">Float Speed</label>
+                    <div class="grid grid-cols-3 gap-3">
+                        <button data-speed="slow" class="btn-speed py-3 px-2 rounded-xl bg-cyan-600 border-2 border-cyan-300 font-bold text-white shadow-lg">Slow</button>
+                        <button data-speed="medium" class="btn-speed py-3 px-2 rounded-xl bg-slate-800 border-2 border-slate-700 font-bold">Medium</button>
+                        <button data-speed="fast" class="btn-speed py-3 px-2 rounded-xl bg-slate-800 border-2 border-slate-700 font-bold">Fast</button>
+                    </div>
+                </div>
+
+                <!-- Show Hitbox Outline Toggle for Testing -->
+                <div class="flex items-center justify-between p-4 bg-slate-800/80 rounded-2xl border border-slate-700">
+                    <div>
+                        <div class="font-bold text-white">Show Invisible Hitboxes</div>
+                        <div class="text-xs text-slate-400">Highlights target hit zones for motor debugging.</div>
+                    </div>
+                    <button id="toggleHitboxVis" class="px-5 py-2 rounded-xl bg-slate-700 border border-slate-500 font-bold text-slate-300">OFF</button>
+                </div>
+
+                <!-- Actions -->
+                <div class="pt-4 border-t border-slate-700 flex justify-between gap-4">
+                    <button id="btnResetStats" class="py-3 px-5 rounded-xl bg-rose-900/80 border border-rose-600 font-bold text-rose-200">Reset Score</button>
+                    <button id="btnDoneSettings" class="py-3 px-8 rounded-xl bg-emerald-600 font-bold text-white">Done</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // High-reliability Web Audio API synth
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                    if (AudioCtx) this.ctx = new AudioCtx();
+                }
+                if (this.ctx && this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playPop() {
+                this.init();
+                if (!this.ctx) return;
+
+                try {
+                    const now = this.ctx.currentTime;
+                    
+                    // Pop synth
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(380 + Math.random() * 180, now);
+                    osc.frequency.exponentialRampToValueAtTime(50, now + 0.07);
+
+                    gain.gain.setValueAtTime(0.8, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.07);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    osc.start(now);
+                    osc.stop(now + 0.07);
+                } catch (e) {
+                    console.error("Audio playback error:", e);
+                }
+            }
+        }
+
+        const sound = new SoundEngine();
+
+        // Accessible game options
+        const GameSettings = {
+            hitboxScale: 1.85,      // Hitbox padding multiplier
+            speedMode: 'slow',
+            showHitboxes: false
+        };
+
+        const SpeedValues = {
+            slow: 1.2,
+            medium: 2.4,
+            fast: 3.8
+        };
+
+        const BALLOON_COLORS = [
+            { bg: '#FF2A6D', shine: '#FFB3C6' },
+            { bg: '#05D54B', shine: '#A3FFC2' },
+            { bg: '#00F0FF', shine: '#BCEEFF' },
+            { bg: '#FFB800', shine: '#FFF0B3' },
+            { bg: '#9D00FF', shine: '#E2B3FF' },
+            { bg: '#FF5722', shine: '#FFC4B3' }
+        ];
+
+        let canvas, ctx;
+        let balloons = [];
+        let particles = [];
+        let totalPops = 0;
+        let score = 0;
+        let lastSpawnTime = 0;
+
+        class Balloon {
+            constructor(w, h) {
+                this.radius = 60 + Math.random() * 15; // Base visual size
+                this.x = Math.random() * (w - this.radius * 2) + this.radius;
+                this.y = h + this.radius + 30;
+
+                this.speed = SpeedValues[GameSettings.speedMode] + Math.random() * 0.4;
+                this.wobbleSpeed = 0.02 + Math.random() * 0.02;
+                this.wobbleAngle = Math.random() * Math.PI * 2;
+                this.color = BALLOON_COLORS[Math.floor(Math.random() * BALLOON_COLORS.length)];
+            }
+
+            update() {
+                this.y -= this.speed;
+                this.wobbleAngle += this.wobbleSpeed;
+                this.x += Math.sin(this.wobbleAngle) * 1.2;
+            }
+
+            draw(ctx) {
+                ctx.save();
+
+                // Draw Optional Hitbox Outline for Testing/Verification
+                if (GameSettings.showHitboxes) {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius * GameSettings.hitboxScale, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(255, 255, 0, 0.4)';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                }
+
+                // String
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y + this.radius);
+                ctx.lineTo(this.x + Math.sin(this.wobbleAngle) * 10, this.y + this.radius + 60);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                // Main Oval Body
+                ctx.beginPath();
+                ctx.ellipse(this.x, this.y, this.radius * 0.88, this.radius, 0, 0, Math.PI * 2);
+                
+                const grad = ctx.createRadialGradient(
+                    this.x - this.radius * 0.3, 
+                    this.y - this.radius * 0.3, 
+                    this.radius * 0.1, 
+                    this.x, 
+                    this.y, 
+                    this.radius
+                );
+                grad.addColorStop(0, this.color.shine);
+                grad.addColorStop(0.3, this.color.bg);
+                grad.addColorStop(1, '#000000');
+
+                ctx.fillStyle = grad;
+                ctx.fill();
+
+                // Shine
+                ctx.beginPath();
+                ctx.ellipse(this.x - this.radius * 0.35, this.y - this.radius * 0.35, this.radius * 0.22, this.radius * 0.12, -Math.PI / 4, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+                ctx.fill();
+
+                ctx.restore();
+            }
+
+            // High-reliability distance check
+            isHit(touchX, touchY) {
+                const hitRadius = this.radius * GameSettings.hitboxScale;
+                const dx = touchX - this.x;
+                const dy = touchY - this.y;
+                return (dx * dx + dy * dy) <= (hitRadius * hitRadius);
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.radius = Math.random() * 7 + 4;
+                const angle = Math.random() * Math.PI * 2;
+                const spd = Math.random() * 10 + 3;
+                this.vx = Math.cos(angle) * spd;
+                this.vy = Math.sin(angle) * spd;
+                this.alpha = 1.0;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += 0.2; // Gravity
+                this.alpha -= 0.025;
+            }
+
+            draw(ctx) {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.alpha);
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function handleTouchOrClick(e) {
+            // Unlock Web Audio API context on first screen tap
+            sound.init();
+
+            // Prevent default touch scrolling or double-firing
+            if (e.cancelable) e.preventDefault();
+
+            const rect = canvas.getBoundingClientRect();
+            let points = [];
+
+            if (e.changedTouches && e.changedTouches.length > 0) {
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    points.push({
+                        x: e.changedTouches[i].clientX - rect.left,
+                        y: e.changedTouches[i].clientY - rect.top
+                    });
+                }
+            } else {
+                points.push({
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top
+                });
+            }
+
+            // Test hits for every touch point against active balloons
+            points.forEach(pt => {
+                for (let i = balloons.length - 1; i >= 0; i--) {
+                    if (balloons[i].isHit(pt.x, pt.y)) {
+                        popBalloon(i);
+                        break; // Pop top-most balloon per touch point
+                    }
+                }
+            });
+        }
+
+        function popBalloon(index) {
+            const b = balloons[index];
+            balloons.splice(index, 1);
+
+            totalPops++;
+            score += 100;
+            updateUI();
+
+            sound.playPop();
+
+            // Spawn confetti particles
+            for (let i = 0; i < 20; i++) {
+                particles.push(new Particle(b.x, b.y, b.color.bg));
+                particles.push(new Particle(b.x, b.y, '#FFFFFF'));
+            }
+        }
+
+        function gameLoop(time) {
+            // Auto-spawn balloon logic
+            if (time - lastSpawnTime > 1100) {
+                if (balloons.length < 12) {
+                    balloons.push(new Balloon(canvas.width, canvas.height));
+                }
+                lastSpawnTime = time;
+            }
+
+            // Clear Background
+            ctx.fillStyle = '#0b1329';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Update & Draw Balloons
+            for (let i = balloons.length - 1; i >= 0; i--) {
+                const b = balloons[i];
+                b.update();
+                b.draw(ctx);
+
+                // Remove when drifting off screen top
+                if (b.y < -b.radius * 2) {
+                    balloons.splice(i, 1);
+                }
+            }
+
+            // Update & Draw Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.update();
+                p.draw(ctx);
+                if (p.alpha <= 0) particles.splice(i, 1);
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        function updateUI() {
+            document.getElementById('popCounter').innerText = totalPops;
+            document.getElementById('scoreDisplay').innerText = score;
+        }
+
+        function setupEvents() {
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
+
+            function resize() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            window.addEventListener('resize', resize);
+            resize();
+
+            // Multi-listener touch binding for absolute reliability
+            canvas.addEventListener('pointerdown', handleTouchOrClick, { passive: false });
+            canvas.addEventListener('touchstart', handleTouchOrClick, { passive: false });
+
+            // Staff Panel Controls
+            const modal = document.getElementById('settingsModal');
+            document.getElementById('btnOpenSettings').onclick = () => modal.classList.remove('hidden'), modal.classList.add('flex');
+            document.getElementById('btnCloseSettings').onclick = () => modal.classList.add('hidden'), modal.classList.remove('flex');
+            document.getElementById('btnDoneSettings').onclick = () => modal.classList.add('hidden'), modal.classList.remove('flex');
+
+            document.querySelectorAll('.btn-hitbox').forEach(btn => {
+                btn.onclick = () => {
+                    document.querySelectorAll('.btn-hitbox').forEach(b => b.className = 'btn-hitbox py-3 px-2 rounded-xl bg-slate-800 border-2 border-slate-700 font-bold');
+                    btn.className = 'btn-hitbox py-3 px-2 rounded-xl bg-cyan-600 border-2 border-cyan-300 font-bold text-white shadow-lg';
+                    GameSettings.hitboxScale = parseFloat(btn.dataset.hitbox);
+                };
+            });
+
+            document.querySelectorAll('.btn-speed').forEach(btn => {
+                btn.onclick = () => {
+                    document.querySelectorAll('.btn-speed').forEach(b => b.className = 'btn-speed py-3 px-2 rounded-xl bg-slate-800 border-2 border-slate-700 font-bold');
+                    btn.className = 'btn-speed py-3 px-2 rounded-xl bg-cyan-600 border-2 border-cyan-300 font-bold text-white shadow-lg';
+                    GameSettings.speedMode = btn.dataset.speed;
+                };
+            });
+
+            const toggleVisBtn = document.getElementById('toggleHitboxVis');
+            toggleVisBtn.onclick = () => {
+                GameSettings.showHitboxes = !GameSettings.showHitboxes;
+                toggleVisBtn.innerText = GameSettings.showHitboxes ? 'ON' : 'OFF';
+                toggleVisBtn.className = GameSettings.showHitboxes ? 'px-5 py-2 rounded-xl bg-emerald-600 border border-emerald-400 font-bold text-white' : 'px-5 py-2 rounded-xl bg-slate-700 border border-slate-500 font-bold text-slate-300';
+            };
+
+            document.getElementById('btnResetStats').onclick = () => {
+
+                totalPops = 0;
+                score = 0;
+                updateUI();
+            };
+
+            // Prime audio context on any initial user touch anywhere
+            window.addEventListener('touchstart', () => sound.init(), { once: true });
+            window.addEventListener('pointerdown', () => sound.init(), { once: true });
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        window.onload = setupEvents;
+    </script>
+</body>
+</html>
